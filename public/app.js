@@ -26,11 +26,57 @@ function showStatus(message, isError = false) {
 // Function to connect wallet
 async function connectWallet() {
   try {
-    // Check if MetaMask or compatible wallet is installed
-    if (typeof window.ethereum === 'undefined') {
-      showStatus('Please install MetaMask or a Web3 wallet!', true);
+    // Function to detect which wallet is available
+function detectWallet() {
+  // Check for Coinbase Wallet (Base Wallet)
+  if (window.coinbaseSolana || window.coinbaseWalletExtension) {
+    return 'coinbase';
+  }
+  
+  // Check for MetaMask
+  if (window.ethereum && window.ethereum.isMetaMask) {
+    return 'metamask';
+  }
+  
+  // Check for any Web3 wallet
+  if (window.ethereum) {
+    return 'web3';
+  }
+  
+  return null;
+}
+
+// Function to connect wallet
+async function connectWallet() {
+  try {
+    const walletType = detectWallet();
+    
+    // If no wallet detected, show helpful message
+    if (!walletType) {
+      showStatus('Please install Base Wallet or MetaMask!', true);
+      
+      // Show install links after a moment
+      setTimeout(() => {
+        const installMsg = 'Get Base Wallet: https://wallet.coinbase.com or MetaMask: https://metamask.io';
+        statusDiv.innerHTML = `
+          <div style="text-align: left; font-size: 14px;">
+            <strong>No wallet detected!</strong><br><br>
+            📱 <a href="https://wallet.coinbase.com" target="_blank" style="color: #0052FF;">Get Base Wallet</a><br>
+            🦊 <a href="https://metamask.io" target="_blank" style="color: #F6851B;">Get MetaMask</a>
+          </div>
+        `;
+      }, 100);
       return;
     }
+    
+    // Show which wallet was detected
+    const walletNames = {
+      'coinbase': '🔵 Base Wallet',
+      'metamask': '🦊 MetaMask', 
+      'web3': '👛 Web3 Wallet'
+    };
+    
+    showStatus(`Connecting with ${walletNames[walletType]}...`);
 
     // Request account access
     const accounts = await window.ethereum.request({ 
@@ -74,7 +120,30 @@ async function connectWallet() {
           throw switchError;
         }
       }
+      
+      // Refresh provider after network switch
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
     }
+    
+    // Update UI after successful connection
+    showStatus(`${walletNames[walletType]} Connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
+    connectBtn.style.display = 'none';
+    sendTipBtn.style.display = 'block';
+    
+  } catch (error) {
+    console.error(error);
+    
+    // User-friendly error messages
+    if (error.code === 4001) {
+      showStatus('Connection cancelled. Please try again.', true);
+    } else if (error.code === -32002) {
+      showStatus('Connection request pending. Check your wallet.', true);
+    } else {
+      showStatus('Failed to connect: ' + error.message, true);
+    }
+  }
+}
     
     // Update UI after successful connection
     showStatus(`Connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
