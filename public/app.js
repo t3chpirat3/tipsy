@@ -183,15 +183,33 @@ if (typeof window.ethereum !== 'undefined') {
       showStatus('Wallet disconnected', true);
       connectBtn.style.display = 'block';
       sendTipBtn.style.display = 'none';
+      provider = null;
+      signer = null;
+      userAddress = null;
     } else {
-      // User switched accounts
+      // User switched accounts - reconnect without reloading
       userAddress = accounts[0];
-      showStatus(`Switched to: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
+      if (provider) {
+        signer = provider.getSigner();
+        showStatus(`Switched to: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
+      }
     }
   });
   
-  window.ethereum.on('chainChanged', () => {
-    // Reload page when chain changes
-    window.location.reload();
+  window.ethereum.on('chainChanged', async (chainId) => {
+    // Check if still on Base network
+    if (chainId === BASE_CHAIN_ID || parseInt(chainId, 16) === 8453) {
+      // Still on Base, just reconnect
+      if (userAddress) {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        showStatus('Network updated, still connected');
+      }
+    } else {
+      // Switched away from Base
+      showStatus('Please switch back to Base network', true);
+      connectBtn.style.display = 'block';
+      sendTipBtn.style.display = 'none';
+    }
   });
 }
