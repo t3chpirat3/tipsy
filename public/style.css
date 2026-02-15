@@ -105,3 +105,19 @@ button:active {
   margin-top: 20px;
   opacity: 0.8;
 }
+
+#balanceDisplay {
+  margin-top: 15px;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+#balanceDisplay .balance-amount {
+  font-size: 20px;
+  margin-top: 5px;
+}

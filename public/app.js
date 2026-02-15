@@ -10,6 +10,8 @@ let userAddress;
 // Get references to HTML elements
 const connectBtn = document.getElementById('connectBtn');
 const sendTipBtn = document.getElementById('sendTipBtn');
+const disconnectBtn = document.getElementById('disconnectBtn');
+const balanceDisplay = document.getElementById('balanceDisplay');
 const statusDiv = document.getElementById('status');
 const recipientInput = document.getElementById('recipient');
 const amountInput = document.getElementById('amount');
@@ -23,10 +25,26 @@ function showStatus(message, isError = false) {
   statusDiv.style.display = 'block';
 }
 
-// Function to connect wallet
-async function connectWallet() {
+// Function to fetch and display wallet balance
+async function updateBalance() {
   try {
-    // Function to detect which wallet is available
+    if (!provider || !userAddress) return;
+    
+    const balance = await provider.getBalance(userAddress);
+    const balanceInEth = ethers.utils.formatEther(balance);
+    const balanceRounded = parseFloat(balanceInEth).toFixed(4);
+    
+    balanceDisplay.innerHTML = `
+      <div>💰 Your Balance</div>
+      <div class="balance-amount">${balanceRounded} ETH</div>
+    `;
+    balanceDisplay.style.display = 'block';
+  } catch (error) {
+    console.error('Failed to fetch balance:', error);
+  }
+}
+
+// Function to detect which wallet is available
 function detectWallet() {
   // Check for Coinbase Wallet (Base Wallet)
   if (window.coinbaseSolana || window.coinbaseWalletExtension) {
@@ -68,8 +86,7 @@ async function connectWallet() {
       }, 100);
       return;
     }
-    
-    // Show which wallet was detected
+// Show which wallet was detected
     const walletNames = {
       'coinbase': '🔵 Base Wallet',
       'metamask': '🦊 MetaMask', 
@@ -130,6 +147,8 @@ async function connectWallet() {
     showStatus(`${walletNames[walletType]} Connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
     connectBtn.style.display = 'none';
     sendTipBtn.style.display = 'block';
+    disconnectBtn.style.display = 'block';
+    await updateBalance();
     
   } catch (error) {
     console.error(error);
@@ -142,17 +161,6 @@ async function connectWallet() {
     } else {
       showStatus('Failed to connect: ' + error.message, true);
     }
-  }
-}
-    
-    // Update UI after successful connection
-    showStatus(`Connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
-    connectBtn.style.display = 'none';
-    sendTipBtn.style.display = 'block';
-    
-  } catch (error) {
-    console.error(error);
-    showStatus('Failed to connect wallet: ' + error.message, true);
   }
 }
 
@@ -229,6 +237,9 @@ async function sendTip() {
     
     showStatus(`✅ Tip sent successfully! TX: ${receipt.transactionHash.slice(0, 10)}...`);
     
+    // Update balance after transaction
+    await updateBalance();
+    
     // Clear inputs
     document.getElementById('recipient').value = '';
     document.getElementById('amount').value = '';
@@ -239,10 +250,31 @@ async function sendTip() {
     showStatus('Failed to send tip: ' + error.message, true);
   }
 }
+// Function to disconnect wallet
+function disconnectWallet() {
+  // Clear wallet data
+  provider = null;
+  signer = null;
+  userAddress = null;
+  
+  // Clear input fields
+  document.getElementById('recipient').value = '';
+  document.getElementById('amount').value = '';
+  document.getElementById('message').value = '';
+  
+  // Update UI
+  connectBtn.style.display = 'block';
+  sendTipBtn.style.display = 'none';
+  disconnectBtn.style.display = 'none';
+  balanceDisplay.style.display = 'none';
+  
+  showStatus('Wallet disconnected. Connect again to send tips.');
+}
 
 // Event listeners
 connectBtn.addEventListener('click', connectWallet);
 sendTipBtn.addEventListener('click', sendTip);
+disconnectBtn.addEventListener('click', disconnectWallet);
 
 // Listen for account changes
 if (typeof window.ethereum !== 'undefined') {
@@ -252,6 +284,8 @@ if (typeof window.ethereum !== 'undefined') {
       showStatus('Wallet disconnected', true);
       connectBtn.style.display = 'block';
       sendTipBtn.style.display = 'none';
+      disconnectBtn.style.display = 'none';
+      balanceDisplay.style.display = 'none';
       provider = null;
       signer = null;
       userAddress = null;
@@ -261,6 +295,7 @@ if (typeof window.ethereum !== 'undefined') {
       if (provider) {
         signer = provider.getSigner();
         showStatus(`Switched to: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
+        updateBalance();
       }
     }
   });
@@ -273,12 +308,15 @@ if (typeof window.ethereum !== 'undefined') {
         provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
         showStatus('Network updated, still connected');
+        await updateBalance();
       }
     } else {
       // Switched away from Base
       showStatus('Please switch back to Base network', true);
       connectBtn.style.display = 'block';
       sendTipBtn.style.display = 'none';
+      disconnectBtn.style.display = 'none';
+      balanceDisplay.style.display = 'none';
     }
   });
 }
